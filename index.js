@@ -188,7 +188,7 @@ app.post('/user', async (req, res) => {
           message: "Error: email has been taken",
         });
       } else {
-        client.query("INSERT INTO users (email, username, password) VALUES ($1, crypt($2, gen_salt('bf')))", [req.body.email, email.split('@')[0], req.body.password])
+        client.query("INSERT INTO users (email, username, password) VALUES ($1, crypt($2, gen_salt('bf')))", [req.body.email, req.body.email.split('@')[0], req.body.password])
           .then((result) => {
             res.json({
               status: true,
