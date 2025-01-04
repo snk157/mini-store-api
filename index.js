@@ -2,9 +2,9 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cors = require('cors');
-const AWS = require('aws-sdk');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const multer = require('multer');
-const multerS3 = require('multer-s3');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
@@ -13,13 +13,13 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 8081;
 
-AWS.config.update({
-  region: 'ap-southeast-1',
-  accessKeyId: process.env.AWS_ACCESS_KEY,
-  secretAccessKey: process.env.AWS_SECRET
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
-
-const s3 = new AWS.S3();
 
 const config = {
   connectionString: process.env.DB
@@ -62,19 +62,7 @@ function verifyToken(req, res, next) {
   }
 }
 
-const upload = multer({
-  storage: multerS3({
-    s3,
-    bucket: process.env.AWS_S3_BUCKET,
-    acl: 'public-read',
-    metadata: (req, file, cb) => {
-      cb(null, { fieldName: file.fieldname });
-    },
-    key: (req, file, cb) => {
-      cb(null, `products/${Date.now()}_${file.originalname}`);
-    },
-  }),
-});
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.get('/', async (req, res) => {
   res.status(200).send("OK");
@@ -242,13 +230,10 @@ app.get('/products/:id', verifyToken, async (req, res) => {
 });
 
 app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res) => {
-  
-  if(req.user.user_type != 0)
-  {
-    return res.status(200).json({
-      status: true,
-      data: "",
-      message: "unauthorized",
+  if (req.user.user_type != 0) {
+    return res.status(403).json({
+      status: false,
+      message: 'Unauthorized',
     });
   }
 
@@ -263,8 +248,24 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
   }
 
   try {
-    const imageUrls = files.map((file) => file.location);
-    
+    // Upload files to S3 and collect URLs
+    const imageUrls = await Promise.all(
+      files.map(async (file) => {
+        const fileKey = `products/${Date.now()}_${file.originalname}`;
+        const uploadParams = {
+          Bucket: process.env.AWS_S3_BUCKET,
+          Key: fileKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+          ACL: 'public-read', // Optional: Make file publicly readable
+        };
+
+        await s3.send(new PutObjectCommand(uploadParams));
+        return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+      })
+    );
+
+    // Save product details and image URLs to the database
     const query = `
       INSERT INTO products (name, description, qty, price, images)
       VALUES ($1, $2, $3, $4, $5)
