@@ -96,7 +96,7 @@ app.post('/login', async (req, res) => {
   client.query("SELECT * FROM users WHERE email = $1 AND password = crypt($2, password)", [req.body.email, req.body.password])
     .then((result) => {
       if (result.rows.length > 0) {
-        const token = GenerateJWT(result.rows[0].id, result.rows[0].email, result.rows[0].role);
+        const token = GenerateJWT(result.rows[0].id, result.rows[0].email, result.rows[0].user_type);
         client.query("UPDATE users SET last_login = NOW() WHERE id = $1", [result.rows[0].id]);
 
         res.status(200).json({
