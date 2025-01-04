@@ -237,7 +237,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
     });
   }
 
-  const { name, description, qty, price } = req.body;
+  const { name, description, qty, price, category, is_hot, is_feature } = req.body;
   const files = req.files;
 
   if (!files || files.length === 0) {
@@ -257,7 +257,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
           Key: fileKey,
           Body: file.buffer,
           ContentType: file.mimetype,
-          ACL: 'public-read', // Optional: Make file publicly readable
+          ACL: 'public-read',
         };
 
         await s3.send(new PutObjectCommand(uploadParams));
@@ -267,10 +267,10 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
 
     // Save product details and image URLs to the database
     const query = `
-      INSERT INTO products (name, description, qty, price, images)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO products (product_name, description, qty, price, images, category_id, ishot, isfeature)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `;
-    const values = [name, description, qty, price, JSON.stringify(imageUrls)];
+    const values = [name, description, qty, price, JSON.stringify(imageUrls), category, is_hot, is_feature];
 
     await client.query(query, values);
 
