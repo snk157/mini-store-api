@@ -3,6 +3,8 @@ const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cors = require('cors');
 const AWS = require('aws-sdk');
+const multer = require('multer');
+const multerS3 = require('multer-s3');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
@@ -60,25 +62,19 @@ function verifyToken(req, res, next) {
   }
 }
 
-const uploadImageToS3 = async (imagePath, imageName) => {
-  const fileContent = fs.readFileSync(imagePath);
-  
-  const params = {
-    Bucket: 'mini-store-bucket',
-    Key: imageName,
-    Body: fileContent,
-    ContentType: 'image/jpeg',
-    ACL: 'public-read',
-  };
-  
-  try {
-    const data = await s3.upload(params).promise();
-    return data.Location;
-  } catch (err) {
-    console.error(err);
-    return null;
-  }
-};
+const upload = multer({
+  storage: multerS3({
+    s3,
+    bucket: process.env.AWS_S3_BUCKET,
+    acl: 'public-read',
+    metadata: (req, file, cb) => {
+      cb(null, { fieldName: file.fieldname });
+    },
+    key: (req, file, cb) => {
+      cb(null, `products/${Date.now()}_${file.originalname}`);
+    },
+  }),
+});
 
 app.get('/', async (req, res) => {
   res.status(200).send("OK");
@@ -245,7 +241,7 @@ app.get('/products/:id', verifyToken, async (req, res) => {
     });
 });
 
-app.post('/product', verifyToken, async (req, res) => {
+app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res) => {
   
   if(req.user.user_type != 0)
   {
@@ -256,9 +252,10 @@ app.post('/product', verifyToken, async (req, res) => {
     });
   }
 
-  const { name, description, qty, price, imagePaths } = req.body;
+  const { name, description, qty, price } = req.body;
+  const files = req.files;
 
-  if (!imagePaths || imagePaths.length === 0) {
+  if (!files || files.length === 0) {
     return res.status(400).json({
       status: false,
       message: 'Error: Please provide at least one image.',
@@ -266,7 +263,7 @@ app.post('/product', verifyToken, async (req, res) => {
   }
 
   try {
-    const imageUrls = await Promise.all(imagePaths.map(imagePath => uploadImageToS3(imagePath, Date.now() + path.extname(imagePath))));
+    const imageUrls = files.map((file) => file.location);
     
     const query = `
       INSERT INTO products (name, description, qty, price, images)
