@@ -346,6 +346,21 @@ app.put('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
+app.get('/categories', verifyToken, async (req, res) => {
+  client.query("SELECT * FROM categories")
+    .then((result) => {
+      return res.status(200).json({
+        status: true,
+        data: result.rows,
+        message: "Success",
+      });
+    })
+    .catch((e) => {
+      console.error(e.stack);
+      res.status(500).send(e.stack);
+    });
+});
+
 app.get('/carts', verifyToken, async (req, res) => {
   const { user_id } = req.body;
 
