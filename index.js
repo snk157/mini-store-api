@@ -29,14 +29,16 @@ const client = new Client(config);
 client.connect();
 
 const corsOptions = {
-  origin: '*', // Allow only this domain
+  origin: '*',
   methods: 'GET,POST,PUT,DELETE,OPTIONS',
-  allowedHeaders: 'Content-Type,Authorization',
+  allowedHeaders: 'Content-Type, Authorization',
 };
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: false, parameterLimit: 50000 }));
+
+app.options('*', cors(corsOptions));
 
 app.listen(PORT, () => {
   console.log(`listening on ${PORT}`);
