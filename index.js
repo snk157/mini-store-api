@@ -245,7 +245,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
     });
   }
 
-  const { name, description, qty, price, category, is_hot, is_feature } = req.body;
+  const { product_name, description, quantity, price, category, is_hot, is_feature } = req.body;
   const files = req.files;
 
   if (!files || files.length === 0) {
@@ -278,7 +278,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
       INSERT INTO products (product_name, description, qty, price, images, category_id, ishot, isfeature)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `;
-    const values = [name, description, qty, price, JSON.stringify(imageUrls), category, is_hot, is_feature];
+    const values = [product_name, description, quantity, price, JSON.stringify(imageUrls), category, is_hot, is_feature];
 
     await client.query(query, values);
 
