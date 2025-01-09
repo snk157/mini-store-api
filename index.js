@@ -245,7 +245,13 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
     });
   }
 
-  const { product_name, description, quantity, price, category, is_hot, is_feature } = req.body;
+  const productName = req.body['product-name'];
+  const description = req.body['description'];
+  const quantity = req.body['quantity'];
+  const price = req.body['price'];
+  const category = req.body['product-category'];
+  const isHot = req.body['is-hot'] === 'on';
+  const isFeature = req.body['is-feature'] === 'on';
   const files = req.files;
 
   if (!files || files.length === 0) {
@@ -278,7 +284,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
       INSERT INTO products (product_name, description, qty, price, images, category_id, ishot, isfeature)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `;
-    const values = [product_name, description, quantity, price, JSON.stringify(imageUrls), category, is_hot, is_feature];
+    const values = [productName, description, quantity, price, JSON.stringify(imageUrls), category, isHot, isFeature];
 
     await client.query(query, values);
 
