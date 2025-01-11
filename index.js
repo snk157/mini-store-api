@@ -360,6 +360,52 @@ app.put('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
+app.delete('/products/:id', verifyToken, async (req, res) => {
+
+  if (req.user.user_type != 0) {
+    return res.status(200).json({
+      status: true,
+      data: "",
+      message: "unauthorized",
+    });
+  }
+
+  const productId = req.params.id;
+
+  if (!productId) {
+    return res.status(400).json({
+      status: false,
+      message: 'Error: Product ID is required.',
+    });
+  }
+
+  try {
+    const query = `UPDATE products SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`;
+    const values = [productId];
+
+    const result = await client.query(query, values);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        status: false,
+        message: 'Error: Product not found or already deleted.',
+      });
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Product soft deleted successfully.',
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: false,
+      message: 'Error deleting product.',
+      error: err.message,
+    });
+  }
+});
+
 app.get('/categories', verifyToken, async (req, res) => {
   client.query("SELECT * FROM categories")
     .then((result) => {
