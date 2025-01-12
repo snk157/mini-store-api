@@ -201,18 +201,25 @@ app.post('/user', async (req, res) => {
 });
 
 app.get('/products', verifyToken, async (req, res) => {
-  client.query("SELECT * FROM products")
-    .then((result) => {
-      return res.status(200).json({
-        status: true,
-        data: result.rows,
-        message: "Success",
-      });
-    })
-    .catch((e) => {
-      console.error(e.stack);
-      res.status(500).send(e.stack);
+  const { page = 1, limit = 15 } = req.query;
+  const offset = (page - 1) * limit;
+
+  try {
+    const countResult = await client.query("SELECT COUNT(*) AS total FROM products");
+    const totalItems = parseInt(countResult.rows[0].total, 10);
+
+    const result = await client.query("SELECT * FROM products LIMIT $1 OFFSET $2", [limit, offset]);
+
+    return res.status(200).json({
+      status: true,
+      data: result.rows,
+      total: totalItems,
+      message: "Success",
     });
+  } catch (e) {
+    console.error(e.stack);
+    return res.status(500).send(e.stack);
+  }
 });
 
 app.get('/products/:id', verifyToken, async (req, res) => {
