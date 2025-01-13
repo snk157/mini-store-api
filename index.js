@@ -201,14 +201,25 @@ app.post('/user', async (req, res) => {
 });
 
 app.get('/products', verifyToken, async (req, res) => {
-  const { page = 1, limit = 15 } = req.query;
+  const { page = 1, limit = 15 , isHot = false, isFeature = false} = req.query;
   const offset = (page - 1) * limit;
 
   try {
     const countResult = await client.query("SELECT COUNT(*) AS total FROM products");
     const totalItems = parseInt(countResult.rows[0].total, 10);
 
-    const result = await client.query("SELECT * FROM products LIMIT $1 OFFSET $2", [limit, offset]);
+    let query = "SELECT * FROM products WHERE 1=1";
+    const params = [];
+
+    if (isHot === 'true') {
+      query += " AND ishot = true";
+    }
+    if (isFeature === 'true') {
+      query += " AND isfeature = true";
+    }
+    
+    query += " LIMIT $1 OFFSET $2";
+    const result = await client.query(query, [limit, offset]);
 
     return res.status(200).json({
       status: true,
