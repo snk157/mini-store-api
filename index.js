@@ -218,6 +218,11 @@ app.get('/products', async (req, res) => {
       query += " AND isfeature = true";
     }
 
+    if(categoryId && categoryId != 0)
+    {
+      query += " AND category_id = "+categoryId;
+    }
+
     query += " LIMIT $1 OFFSET $2";
     const result = await client.query(query, [limit, offset]);
 
