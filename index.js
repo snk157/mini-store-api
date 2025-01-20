@@ -92,7 +92,7 @@ app.post('/login', async (req, res) => {
         client.query("UPDATE users SET last_login = NOW() WHERE id = $1", [result.rows[0].id]);
 
         res.status(200).json({
-          success: true,
+          status: true,
           data: {
             userId: result.rows[0].id,
             token: token,
