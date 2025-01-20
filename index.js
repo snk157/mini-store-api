@@ -202,6 +202,18 @@ app.post('/user', async (req, res) => {
 
 app.post('/profile/:id', verifyToken, async (req, res) => {
 
+  if(req.user.userId == req.params.id || req.user.user_type == 0)
+  {
+    
+  }
+  else
+  {
+    return res.status(200).json({
+      status: true,
+      data: "",
+      message: "unauthorized",
+    });
+  }
 });
 
 app.get('/products', async (req, res) => {
@@ -242,7 +254,7 @@ app.get('/products', async (req, res) => {
   }
 });
 
-app.get('/products/:id', verifyToken, async (req, res) => {
+app.get('/product/:id', verifyToken, async (req, res) => {
   client.query("SELECT * FROM products WHERE id = $1", [req.params.id])
     .then((result) => {
       if (result.rows.length === 0) {
@@ -329,7 +341,7 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
   }
 });
 
-app.put('/products/:id', verifyToken, async (req, res) => {
+app.put('/product/:id', verifyToken, async (req, res) => {
   
   if(req.user.user_type != 0)
     {
@@ -387,7 +399,7 @@ app.put('/products/:id', verifyToken, async (req, res) => {
   }
 });
 
-app.delete('/products/:id', verifyToken, async (req, res) => {
+app.delete('/product/:id', verifyToken, async (req, res) => {
 
   if (req.user.user_type != 0) {
     return res.status(200).json({
