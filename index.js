@@ -254,7 +254,7 @@ app.get('/products', async (req, res) => {
   }
 });
 
-app.get('/product/:id', verifyToken, async (req, res) => {
+app.get('/product/:id', async (req, res) => {
   client.query("SELECT * FROM products WHERE id = $1", [req.params.id])
     .then((result) => {
       if (result.rows.length === 0) {
