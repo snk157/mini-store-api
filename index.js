@@ -10,6 +10,8 @@ const path = require('path');
 const { Client } = require('pg');
 require('dotenv').config();
 
+const stripe = require('stripe')('sk_test_51QfvT6GsEDb48SGKImVP1ioeRFxC2psxU6xCM8YVspZd5Pswp2dxWxb9DKruY302AWmHlHjSMx1XPdL2PHl0i16J00L5ReVnSG');
+
 const app = express();
 const PORT = process.env.PORT || 8081;
 
@@ -808,10 +810,21 @@ app.post('/orders', verifyToken, async (req, res) => {
 
           // Close the cart by updating its status
           await client.query('UPDATE carts SET status = 0 WHERE id = $1', [cartId]);
+          
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: netTotal,
+            currency: 'myr',
+            automatic_payment_methods: {
+              enabled: true,
+            },
+          });
 
           return res.status(201).json({
             status: true,
-            data: orderResult.rows[0],
+            data: {
+              order: orderResult.rows[0],
+              client_secret: paymentIntent.client_secret
+            },
             message: "Order created successfully, and cart has been closed.",
           });
 
