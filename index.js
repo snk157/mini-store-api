@@ -155,7 +155,7 @@ app.get('/user/:id', verifyToken, async (req, res) => {
   else
   {
     return res.status(200).json({
-      status: true,
+      status: false,
       data: "",
       message: "unauthorized",
     });
@@ -202,14 +202,69 @@ app.post('/user', async (req, res) => {
 
 app.post('/profile/:id', verifyToken, async (req, res) => {
 
-  if(req.user.userId == req.params.id || req.user.user_type == 0)
+  if(req.user.userId == req.params.id)
   {
+    const result = await client.query("SELECT password FROM users WHERE id = $1 AND password = crypt($2, password)", [req.user.userId, req.body.oldPassword]);
+    if(result.rows.length > 0)
+    {
+      if (req.body.name || req.body.contact) {
+        const updates = [];
+        const values = [];
+        let query = "UPDATE users SET ";
+
+        if (req.body.name) {
+          updates.push("name = $" + (values.length + 1));
+          values.push(req.body.name);
+        }
+        if (req.body.contact) {
+          updates.push("contact = $" + (values.length + 1));
+          values.push(req.body.contact);
+        }
+
+        query += updates.join(", ") + " WHERE id = $" + (values.length + 1);
+        values.push(targetId);
+
+        await client.query(query, values);
+      }
+
+      if (req.body.newPassword)
+      {
+        await client.query("UPDATE users SET password = crypt($1, gen_salt('bf')) WHERE id = $2", [req.body.newPassword, targetId]);
+      }
+    }
+  }
+  else if(req.user.user_type == 0)
+  {
+
+    if (req.body.name || req.body.contact) {
+      const updates = [];
+      const values = [];
+      let query = "UPDATE users SET ";
+
+      if (req.body.name) {
+        updates.push("name = $" + (values.length + 1));
+        values.push(req.body.name);
+      }
+      if (req.body.contact) {
+        updates.push("contact = $" + (values.length + 1));
+        values.push(req.body.contact);
+      }
+
+      query += updates.join(", ") + " WHERE id = $" + (values.length + 1);
+      values.push(targetId);
+
+      await client.query(query, values);
+    }
     
+    if (req.body.newPassword)
+    {
+      await client.query("UPDATE users SET password = crypt($1, gen_salt('bf')) WHERE id = $2", [req.body.newPassword, targetId]);
+    }
   }
   else
   {
     return res.status(200).json({
-      status: true,
+      status: false,
       data: "",
       message: "unauthorized",
     });
