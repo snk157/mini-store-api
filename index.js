@@ -10,7 +10,7 @@ const path = require('path');
 const { Client } = require('pg');
 require('dotenv').config();
 
-const stripe = require('stripe')();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 8081;
@@ -518,15 +518,16 @@ app.get('/categories', async (req, res) => {
 });
 
 app.get('/carts', verifyToken, async (req, res) => {
-  const { user_id } = req.body;
+  
+  const userId = req.user.userId;
 
   try {
-      const userResult = await client.query('SELECT * FROM users WHERE id = $1', [user_id]);
+      const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
 
       if (userResult.rows.length > 0) {
           const user = userResult.rows[0];
 
-          const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [user_id]);
+          const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
 
           if (cartResult.rows.length > 0) {
               return res.status(200).json({
@@ -535,7 +536,7 @@ app.get('/carts', verifyToken, async (req, res) => {
                   message: "Existing open cart found.",
               });
           } else {
-              const newCartResult = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [user_id]);
+              const newCartResult = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
 
               return res.status(201).json({
                   status: true,
@@ -576,7 +577,6 @@ app.post('/carts', verifyToken, async (req, res) => {
     message: "Success add product into cart.",
   });
 });
-
 
 app.get('/orders', verifyToken, async (req, res) => {
   client.query("SELECT * FROM orders")
