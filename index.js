@@ -10,7 +10,7 @@ const path = require('path');
 const { Client } = require('pg');
 require('dotenv').config();
 
-const stripe = require('stripe')('sk_test_51QfvT6GsEDb48SGKImVP1ioeRFxC2psxU6xCM8YVspZd5Pswp2dxWxb9DKruY302AWmHlHjSMx1XPdL2PHl0i16J00L5ReVnSG');
+const stripe = require('stripe')();
 
 const app = express();
 const PORT = process.env.PORT || 8081;
@@ -555,143 +555,28 @@ app.get('/carts', verifyToken, async (req, res) => {
   }
 });
 
-app.post('/carts/:cart_id', verifyToken, async (req, res) => {
-  const { user_id, action, product_id, quantity } = req.body;
-  const cartId = req.params.cart_id;
+app.post('/carts', verifyToken, async (req, res) => {
 
-  if (typeof(user_id) === 'undefined' || typeof(cartId) === 'undefined' || typeof(action) === 'undefined' || typeof(product_id) === 'undefined' || typeof(quantity) === 'undefined') {
-    return res.status(400).json({
-      status: false,
-      message: "Error: Please provide user_id, cart_id, action, product_id, and quantity.",
-    });
-  }
+  const productId = req.body.productId;
+  const qty = req.body.qty;
+  const userId = req.user.userId;
+  const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1 ORDER BY created_at DESC LIMIT 1',[userId]);
+  const cartId = -1;
 
-  try {
-    // Fetch the user to ensure they exist
-    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [user_id]);
+  if (cartResult.rows.length > 0)
+    cartId = cartResult.rows[0].id;
+  else
+    cartId = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [user_id]);
 
-    if (userResult.rows.length > 0) {
-      const user = userResult.rows[0];
+  const result = await client.query('INSERT INTO cart_items (cart_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *', [cartId, productId, qty]);
 
-      // Ensure the user is a customer
-      if (user.user_type !== 1) {
-        return res.status(403).json({
-          status: false,
-          message: "Only customers can modify their cart.",
-        });
-      }
-
-      // Fetch the cart by user_id and cart_id to ensure it's valid and open (status = 1)
-      const cartResult = await client.query('SELECT * FROM carts WHERE id = $1 AND user_id = $2 AND status = 1', [cartId, user_id]);
-
-      if (cartResult.rows.length > 0) {
-        const cart = cartResult.rows[0];
-
-        // Action based on the 'action' parameter ('add', 'remove', 'update_quantity')
-        if (action === 'add') {
-          // Check if item already exists in the cart
-          const cartItemResult = await client.query('SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2', [cartId, product_id]);
-
-          if (cartItemResult.rows.length > 0) {
-            // If item exists, update the quantity
-            const updatedItem = await client.query(
-              'UPDATE cart_items SET quantity = quantity + $1 WHERE cart_id = $2 AND product_id = $3 RETURNING *',
-              [quantity, cartId, product_id]
-            );
-
-            return res.status(200).json({
-              status: true,
-              message: "Item quantity updated in cart.",
-              data: updatedItem.rows[0],
-            });
-          } else {
-            // If item does not exist, add it to the cart
-            const productResult = await client.query('SELECT * FROM products WHERE id = $1', [product_id]);
-
-            if (productResult.rows.length > 0) {
-              const product = productResult.rows[0];
-
-              const addItem = await client.query(
-                'INSERT INTO cart_items (cart_id, product_id, price, quantity) VALUES ($1, $2, $3, $4) RETURNING *',
-                [cartId, product_id, product.price, quantity]
-              );
-
-              return res.status(200).json({
-                status: true,
-                message: "Item added to cart.",
-                data: addItem.rows[0],
-              });
-            } else {
-              return res.status(404).json({
-                status: false,
-                message: "Product not found.",
-              });
-            }
-          }
-        } else if (action === 'remove') {
-          // Remove item from cart
-          const cartItemResult = await client.query('SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2', [cartId, product_id]);
-
-          if (cartItemResult.rows.length > 0) {
-            const cartItem = cartItemResult.rows[0];
-
-            // Remove the item completely from the cart
-            await client.query('DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2', [cartId, product_id]);
-
-            return res.status(200).json({
-              status: true,
-              message: "Item removed from cart.",
-            });
-          } else {
-            return res.status(404).json({
-              status: false,
-              message: "Item not found in the cart.",
-            });
-          }
-        } else if (action === 'update_quantity') {
-          // Update quantity of an item in the cart
-          const cartItemResult = await client.query('SELECT * FROM cart_items WHERE cart_id = $1 AND product_id = $2', [cartId, product_id]);
-
-          if (cartItemResult.rows.length > 0) {
-            const updatedItem = await client.query(
-              'UPDATE cart_items SET quantity = $1 WHERE cart_id = $2 AND product_id = $3 RETURNING *',
-              [quantity, cartId, product_id]
-            );
-
-            return res.status(200).json({
-              status: true,
-              message: "Item quantity updated in cart.",
-              data: updatedItem.rows[0],
-            });
-          } else {
-            return res.status(404).json({
-              status: false,
-              message: "Item not found in the cart.",
-            });
-          }
-        } else {
-          return res.status(400).json({
-            status: false,
-            message: "Invalid action. Use 'add', 'remove', or 'update_quantity'.",
-          });
-        }
-      } else {
-        return res.status(400).json({
-          status: false,
-          message: "No open cart found for the user.",
-        });
-      }
-    } else {
-      return res.status(404).json({
-        status: false,
-        message: "User not found.",
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).send(error.message);
-  }
+  return res.status(201).json({
+    status: true,
+    data: result.rows[0],
+    message: "Success add product into cart.",
+  });
 });
+
 
 app.get('/orders', verifyToken, async (req, res) => {
   client.query("SELECT * FROM orders")
