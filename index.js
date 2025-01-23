@@ -567,7 +567,7 @@ app.post('/carts', verifyToken, async (req, res) => {
   if (cartResult.rows.length > 0)
     cartId = cartResult.rows[0].id;
   else
-    cartId = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [user_id]);
+    cartId = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [userId]);
 
   const result = await client.query('INSERT INTO cart_items (cart_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *', [cartId, productId, qty]);
 
