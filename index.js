@@ -562,7 +562,7 @@ app.post('/carts', verifyToken, async (req, res) => {
   const qty = req.body.qty;
   const userId = req.user.userId;
   const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1 ORDER BY created_at DESC LIMIT 1',[userId]);
-  const cartId = -1;
+  var cartId = -1;
 
   if (cartResult.rows.length > 0)
     cartId = cartResult.rows[0].id;
