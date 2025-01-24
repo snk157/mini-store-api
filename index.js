@@ -542,6 +542,7 @@ app.get('/carts', verifyToken, async (req, res) => {
         id: product.id,
         product_name: product.product_name,
         description: product.description,
+        images: product.images,
         price: product.price,
         qty: cartItems[i].qty,
       });
