@@ -543,7 +543,7 @@ app.get('/carts', verifyToken, async (req, res) => {
         product_name: product.product_name,
         description: product.description,
         price: product.price,
-        cartQty: cartItems[i].qty,
+        qty: cartItems[i].qty,
       });
     }
   }
