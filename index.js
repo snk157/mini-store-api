@@ -522,28 +522,20 @@ app.get('/carts', verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
   try {
-      const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
+    let cart = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
 
-      if (userResult.rows.length > 0) {
-        const user = userResult.rows[0];
+    if (cart.rows.length < 0) {
+      cart = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
+    }
 
-        let cart = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
+    let cartItem =  await client.query('SELECT * FROM cart_items WHERE id = $1', [cart.rows[0].id]);
+    
+    return res.status(404).json({
+      status: false,
+      data: cartItem.rows,
+      message: "",
+    });
 
-        if (cart.rows.length < 0) {
-          cart = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
-          let cartItem =  await client.query('SELECT * FROM cart_items WHERE id = $1', [cart.rows[0].id]);
-          return res.status(404).json({
-            status: false,
-            data: cartItem.rows,
-            message: "",
-          });
-        }
-      } else {
-        return res.status(404).json({
-          status: false,
-          message: "User not found.",
-        });
-      }
   } catch (error) {
       console.error(error);
       res.status(500).send(error.message);
