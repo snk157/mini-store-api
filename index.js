@@ -91,8 +91,7 @@ app.post('/login', async (req, res) => {
     .then((result) => {
       if (result.rows.length > 0) {
         const token = GenerateJWT(result.rows[0].id, result.rows[0].email, result.rows[0].user_type);
-        client.query("UPDATE users SET last_login = NOW() WHERE id = $1", [result.rows[0].id]);
-
+       
         res.status(200).json({
           status: true,
           data: {
