@@ -525,30 +525,24 @@ app.get('/carts', verifyToken, async (req, res) => {
       const userResult = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
 
       if (userResult.rows.length > 0) {
-          const user = userResult.rows[0];
+        const user = userResult.rows[0];
 
-          const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
+        let cart = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
 
-          if (cartResult.rows.length > 0) {
-              return res.status(200).json({
-                  status: true,
-                  data: cartResult.rows[0],
-                  message: "Existing open cart found.",
-              });
-          } else {
-              const newCartResult = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
-
-              return res.status(201).json({
-                  status: true,
-                  data: newCartResult.rows[0],
-                  message: "New cart created successfully.",
-              });
-          }
-      } else {
+        if (cart.rows.length < 0) {
+          cart = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
+          let cartItem =  await client.query('SELECT * FROM cart_items WHERE id = $1', [cart.rows[0].id]);
           return res.status(404).json({
-              status: false,
-              message: "User not found.",
+            status: false,
+            data: cartItem.rows,
+            message: "",
           });
+        }
+      } else {
+        return res.status(404).json({
+          status: false,
+          message: "User not found.",
+        });
       }
   } catch (error) {
       console.error(error);
