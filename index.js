@@ -578,7 +578,17 @@ app.post('/carts', verifyToken, async (req, res) => {
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
-  client.query("SELECT * FROM orders")
+
+  let query = `SELECT * FROM orders`;
+  let params = [];
+
+  if(req.user.user_type == 1)
+  {
+    query += ` WHERE user_id = $1`;
+    params.push(req.user.userId);
+  }
+
+  client.query(query, params)
     .then((result) => {
       return res.status(200).json({
         status: true,
@@ -594,7 +604,7 @@ app.get('/orders', verifyToken, async (req, res) => {
 
 app.get('/orders/:id', verifyToken, async (req, res) => {
   client.query("SELECT * FROM orders WHERE id = $1", [req.params.id])
-    .then((result) => {
+    .then(async (result) => {
       if (result.rows.length === 0) {
         return res.status(404).json({
           status: false,
@@ -602,9 +612,23 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
         });
       }
 
+      if(req.user.user_type == 1 && result.rows[0].user_id != req.user.userId) {
+        return res.status(404).json({
+          status: false,
+          message: "Error: Unauthorized.",
+        });
+      }
+
+      const itemsResult = await client.query("SELECT * FROM order_items WHERE order_id = $1", [req.params.id]);
+
+      const orderWithItems = {
+        ...orderResult.rows[0],
+        items: itemsResult.rows,
+      };
+  
       return res.status(200).json({
         status: true,
-        data: result.rows[0],
+        data: orderWithItems,
         message: "Success",
       });
     })
@@ -615,123 +639,49 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 });
 
 app.post('/orders', verifyToken, async (req, res) => {
-  const { user_id, coupon_code, shipping_address } = req.body;
+  const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
+  const userId = req.user.id;
 
-  // Validate that the user_id and shipping_address are provided
-  if (typeof(user_id) === 'undefined' || typeof(shipping_address) === 'undefined') {
-    return res.status(400).json({
-      status: false,
-      message: "Error: Please provide the user_id and shipping_address to create an order.",
-    });
+  const cartQuery = 'SELECT * FROM cart WHERE user_id = $1';
+  const cartResult = await client.query(cartQuery, [userId]);
+
+  if (cartResult.rows.length === 0) {
+    return res.status(400).json({ error: 'Cart is empty' });
   }
 
-  try {
-    // Fetch user details
-    const userResult = await client.query('SELECT * FROM users WHERE id = $1', [user_id]);
+  const cartItems = cartResult.rows;
 
-    if (userResult.rows.length > 0) {
-      const user = userResult.rows[0];
+  // Calculate grand total from cart items
+  const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
 
-      // Ensure the user is a customer
-      if (user.user_type !== 1) {
-        return res.status(403).json({
-          status: false,
-          message: "Only customers can place orders.",
-        });
-      }
+  // Insert the order into the orders table
+  const orderQuery = `
+    INSERT INTO orders (
+      firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grand_total
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING id
+  `;
+  const orderValues = [
+    firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grandTotal
+  ];
+  const orderResult = await client.query(orderQuery, orderValues);
+  const orderId = orderResult.rows[0].id;
 
-      // Find the open cart for the user
-      const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [user_id]);
-
-      if (cartResult.rows.length > 0) {
-        const cartId = cartResult.rows[0].id;
-        const cartItemsResult = await client.query('SELECT * FROM cart_items WHERE cart_id = $1', [cartId]);
-
-        if (cartItemsResult.rows.length > 0) {
-          const grossTotal = cartItemsResult.rows.reduce((total, item) => {
-            return total + item.price * item.quantity;
-          }, 0);
-
-          let discount = 0;
-          let couponUsed = null;
-
-          // Apply coupon if provided
-          if (coupon_code) {
-            const couponResult = await client.query('SELECT * FROM coupons WHERE code = $1 AND qty > 0 AND valid_until > NOW()', [coupon_code]);
-
-            if (couponResult.rows.length > 0) {
-              const coupon = couponResult.rows[0];
-
-              // Calculate the discount based on coupon type
-              if (coupon.discount_type === 'percent') {
-                discount = grossTotal * coupon.discount / 100;
-              } else if (coupon.discount_type === 'fixed') {
-                discount = coupon.discount;
-              }
-
-              // Decrease the coupon quantity by 1
-              await client.query('UPDATE coupons SET qty = qty - 1 WHERE id = $1', [coupon.id]);
-
-              couponUsed = coupon_code; // Store the coupon code used
-            } else {
-              return res.status(400).json({
-                status: false,
-                message: "Invalid, expired, or out-of-stock coupon.",
-              });
-            }
-          }
-
-          const netTotal = grossTotal - discount;
-
-          // Calculate shipping cost (if any, assuming it's passed or defaulting to 0)
-          const shippingCost = 0; // If you want to calculate shipping based on address, you can modify this
-
-          // Create the order with the correct totals and shipping information
-          const orderResult = await client.query(
-            "INSERT INTO orders (user_id, cart_id, gross_total, net_total, coupon_code, discount, shipping_address, shipping_cost, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
-            [user_id, cartId, grossTotal, netTotal, couponUsed, discount, shipping_address, shippingCost, 'pending']
-          );
-
-          // Close the cart by updating its status
-          await client.query('UPDATE carts SET status = 0 WHERE id = $1', [cartId]);
-          
-          const paymentIntent = await stripe.paymentIntents.create({
-            amount: netTotal,
-            currency: 'myr',
-            automatic_payment_methods: {
-              enabled: true,
-            },
-          });
-
-          return res.status(201).json({
-            status: true,
-            data: {
-              order: orderResult.rows[0],
-              client_secret: paymentIntent.client_secret
-            },
-            message: "Order created successfully, and cart has been closed.",
-          });
-
-        } else {
-          return res.status(400).json({
-            status: false,
-            message: "No items found in the cart.",
-          });
-        }
-      } else {
-        return res.status(400).json({
-          status: false,
-          message: "No open cart found for the user.",
-        });
-      }
-    } else {
-      return res.status(404).json({
-        status: false,
-        message: "User not found.",
-      });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).send(error.message);
+  // Insert each cart item into the order_items table
+  const orderItemsQuery = `
+    INSERT INTO order_items (order_id, product_name, quantity, unit_price, total_price)
+    VALUES ($1, $2, $3, $4, $5)
+  `;
+  for (const item of cartItems) {
+    const orderItemValues = [
+      orderId, item.product_name, item.quantity, item.unit_price, item.quantity * item.unit_price
+    ];
+    await client.query(orderItemsQuery, orderItemValues);
   }
+
+  // Mark the user's cart as closed (status = 0) after the order is created
+  const closeCartQuery = 'UPDATE cart SET status = 0 WHERE user_id = $1 AND status = 1';
+  await client.query(closeCartQuery, [userId]);
+
+  res.status(201).json({ message: 'Order created successfully', orderId });
 });
