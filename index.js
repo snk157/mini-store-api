@@ -536,7 +536,15 @@ app.get('/carts', verifyToken, async (req, res) => {
   for (let i = 0; i < cartItems.length; i++) {
     const productQuery = await client.query('SELECT * FROM products WHERE id = $1', [cartItems[i].product_id]);
     if (productQuery.rows.length > 0) {
-      data.push(productQuery.rows[0]);
+      const product = productQuery.rows[0];
+
+      data.push({
+        id: product.id,
+        product_name: product.product_name,
+        description: product.description,
+        price: product.price,
+        cartQty: cartItems[i].qty,
+      });
     }
   }
 
