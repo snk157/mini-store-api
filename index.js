@@ -518,28 +518,33 @@ app.get('/categories', async (req, res) => {
 });
 
 app.get('/carts', verifyToken, async (req, res) => {
-  
   const userId = req.user.userId;
 
-  try {
-    let cart = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
+  const cartQuery = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
+  let cart = cartQuery.rows;
 
-    if (cart.rows.length < 0) {
-      cart = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
-    }
-
-    let cartItem =  await client.query('SELECT * FROM cart_items WHERE id = $1', [cart.rows[0].id]);
-    
-    return res.status(404).json({
-      status: false,
-      data: cartItem.rows,
-      message: "",
-    });
-
-  } catch (error) {
-      console.error(error);
-      res.status(500).send(error.message);
+  if (cart.length === 0) {
+    const newCartQuery = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
+    cart = newCartQuery.rows;
   }
+
+  const cartItemsQuery = await client.query('SELECT * FROM cart_items WHERE cart_id = $1', [cart[0].id]);
+  const cartItems = cartItemsQuery.rows;
+
+  const data = [];
+
+  for (let i = 0; i < cartItems.length; i++) {
+    const productQuery = await client.query('SELECT * FROM products WHERE id = $1', [cartItems[i].product_id]);
+    if (productQuery.rows.length > 0) {
+      data.push(productQuery.rows[0]);
+    }
+  }
+
+  res.status(200).json({
+    status: true,
+    data: data,
+    message: "",
+  });
 });
 
 app.post('/carts', verifyToken, async (req, res) => {
