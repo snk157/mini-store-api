@@ -654,7 +654,7 @@ app.post('/orders', verifyToken, async (req, res) => {
   return res.status(200).json({
     status: true,
     data: {
-      orderId: orderId,
+      orderId: 123,
       stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
       paymentIntent: paymentIntent.client_secret
     },
