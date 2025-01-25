@@ -688,7 +688,7 @@ app.post('/checkout', verifyToken, async (req, res) => {
     },
   });
 
-  const successUrl = `http://www.snk157.com/thankyou.html?orderNumber=${session.id}&totalAmount=${ession.amount_total}`;
+  const successUrl = `http://www.snk157.com/thankyou.html?orderNumber=${session.id}&totalAmount=${session.amount_total}`;
   const cancelUrl = `http://www.snk157.com/cancel.html?orderNumber=${session.id}&totalAmount=${session.amount_total}`;
 
   const updatedSession = await stripe.checkout.sessions.update(session.id, {
