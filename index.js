@@ -688,20 +688,11 @@ app.post('/checkout', verifyToken, async (req, res) => {
     },
   });
 
-  const successUrl = `http://www.snk157.com/thankyou.html?orderNumber=${session.id}&totalAmount=${session.amount_total}`;
-  const cancelUrl = `http://www.snk157.com/cancel.html?orderNumber=${session.id}&totalAmount=${session.amount_total}`;
-
-  const updatedSession = await stripe.checkout.sessions.update(session.id, {
-    success_url: successUrl,
-    cancel_url: cancelUrl
-  });
-
-
   // Delete the rows before redirect
   // await client.query('DELETE FROM carts WHERE user_id = $1', [userId]);
 
   // Redirect to Stripe's checkout page
-  res.status(200).json({ sessionUrl: updatedSession.url });
+  res.status(200).json({ sessionUrl: session.url });
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
