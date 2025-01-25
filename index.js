@@ -639,49 +639,6 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 });
 
 app.post('/orders', verifyToken, async (req, res) => {
-  const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
-  const userId = req.user.id;
-
-  const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
-  const cartResult = await client.query(cartQuery, [userId]);
-
-  if (cartResult.rows.length === 0) {
-    return res.status(400).json({ error: 'Cart is empty' });
-  }
-
-  const cartItems = cartResult.rows;
-
-  // Calculate grand total from cart items
-  const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
-
-  // Insert the order into the orders table
-  const orderQuery = `
-    INSERT INTO orders (
-      firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grand_total
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-    RETURNING id
-  `;
-  const orderValues = [
-    firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grandTotal
-  ];
-  const orderResult = await client.query(orderQuery, orderValues);
-  const orderId = orderResult.rows[0].id;
-
-  // Insert each cart item into the order_items table
-  const orderItemsQuery = `
-    INSERT INTO order_items (order_id, product_name, quantity, unit_price, total_price)
-    VALUES ($1, $2, $3, $4, $5)
-  `;
-  for (const item of cartItems) {
-    const orderItemValues = [
-      orderId, item.product_name, item.quantity, item.unit_price, item.quantity * item.unit_price
-    ];
-    await client.query(orderItemsQuery, orderItemValues);
-  }
-
-  // Mark the user's cart as closed (status = 0) after the order is created
-  const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
-  await client.query(closeCartQuery, [userId]);
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: grandTotal,
@@ -703,4 +660,69 @@ app.post('/orders', verifyToken, async (req, res) => {
     },
     message: "",
   });
+
+  // const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
+  // const userId = req.user.id;
+
+  // const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
+  // const cartResult = await client.query(cartQuery, [userId]);
+
+  // if (cartResult.rows.length === 0) {
+  //   return res.status(400).json({ error: 'Cart is empty' });
+  // }
+
+  // const cartItems = cartResult.rows;
+
+  // // Calculate grand total from cart items
+  // const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
+
+  // // Insert the order into the orders table
+  // const orderQuery = `
+  //   INSERT INTO orders (
+  //     firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grand_total
+  //   ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  //   RETURNING id
+  // `;
+  // const orderValues = [
+  //   firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grandTotal
+  // ];
+  // const orderResult = await client.query(orderQuery, orderValues);
+  // const orderId = orderResult.rows[0].id;
+
+  // // Insert each cart item into the order_items table
+  // const orderItemsQuery = `
+  //   INSERT INTO order_items (order_id, product_name, quantity, unit_price, total_price)
+  //   VALUES ($1, $2, $3, $4, $5)
+  // `;
+  // for (const item of cartItems) {
+  //   const orderItemValues = [
+  //     orderId, item.product_name, item.quantity, item.unit_price, item.quantity * item.unit_price
+  //   ];
+  //   await client.query(orderItemsQuery, orderItemValues);
+  // }
+
+  // // Mark the user's cart as closed (status = 0) after the order is created
+  // const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
+  // await client.query(closeCartQuery, [userId]);
+
+  // const paymentIntent = await stripe.paymentIntents.create({
+  //   amount: grandTotal,
+  //   currency: 'myr',
+  //   automatic_payment_methods: {
+  //     enabled: true,
+  //   },
+  // });
+
+  // console.log(process.env.STRIPE_PUBLIC_KEY);
+  // console.log(JSON.stringify(paymentIntent));
+
+  // return res.status(200).json({
+  //   status: true,
+  //   data: {
+  //     orderId: orderId,
+  //     stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
+  //     paymentIntent: paymentIntent.client_secret
+  //   },
+  //   message: "",
+  // });
 });
