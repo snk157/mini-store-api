@@ -673,6 +673,8 @@ app.post('/checkout', verifyToken, async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     line_items: lineItems,
     mode: 'payment',
+    success_url: `http://www.snk157.com/thankyou.html`,
+    cancel_url: `http://www.snk157.com/cancel.html`,
     customer_email: user.rows[0].email,
     billing_address_collection: 'auto',
     shipping_address_collection: {
