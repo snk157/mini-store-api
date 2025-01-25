@@ -691,7 +691,7 @@ app.post('/orders', verifyToken, async (req, res) => {
     },
   });
 
-  res.status(200).json({
+  return res.status(200).json({
     status: true,
     data: {
       orderId: orderId,
