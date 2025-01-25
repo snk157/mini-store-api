@@ -642,7 +642,7 @@ app.post('/orders', verifyToken, async (req, res) => {
   const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
   const userId = req.user.id;
 
-  const cartQuery = 'SELECT * FROM cart WHERE user_id = $1';
+  const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
   const cartResult = await client.query(cartQuery, [userId]);
 
   if (cartResult.rows.length === 0) {
@@ -680,7 +680,7 @@ app.post('/orders', verifyToken, async (req, res) => {
   }
 
   // Mark the user's cart as closed (status = 0) after the order is created
-  const closeCartQuery = 'UPDATE cart SET status = 0 WHERE user_id = $1 AND status = 1';
+  const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
   await client.query(closeCartQuery, [userId]);
 
   const paymentIntent = await stripe.paymentIntents.create({
