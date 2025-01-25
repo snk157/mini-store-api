@@ -559,8 +559,39 @@ app.get('/carts', verifyToken, async (req, res) => {
 app.post('/carts', verifyToken, async (req, res) => {
   const userId = req.user.userId;
   const { productId, qty } = req.body;
-  await client.query('INSERT INTO carts (user_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *', [userId, productId, qty]);
-  res.status(200).json({ message: 'Item added to cart successfully' });
+
+  const existingCartQuery = await client.query(
+    'SELECT * FROM carts WHERE user_id = $1 AND product_id = $2',
+    [userId, productId]
+  );
+
+  if (existingCartQuery.rows.length > 0) {
+    const existingCartItem = existingCartQuery.rows[0];
+    const updatedQty = existingCartItem.qty + qty;
+
+    await client.query(
+      'UPDATE carts SET qty = $1 WHERE id = $2 RETURNING *',
+      [updatedQty, existingCartItem.id]
+    );
+
+    return res.status(200).json({
+      status: true,
+      data: [],
+      message: 'Item quantity updated successfully',
+    });
+  } else {
+    // If the product is not in the cart, add it as a new record
+    await client.query(
+      'INSERT INTO carts (user_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *',
+      [userId, productId, qty]
+    );
+
+    return res.status(200).json({
+      status: true,
+      data: [],
+      message: 'Item added to cart successfully',
+    });
+  }
 });
 
 app.post('/carts/:id', verifyToken, async (req, res) => {
