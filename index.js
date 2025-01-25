@@ -563,6 +563,50 @@ app.post('/carts', verifyToken, async (req, res) => {
   res.status(200).json({ message: 'Item added to cart successfully' });
 });
 
+app.post('/carts/:id', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  const {qty } = req.body;
+  const cartId = req.params.id;
+
+  const updateResult = await client.query('UPDATE carts SET qty = $1 WHERE id = $2 AND user_id = $3 RETURNING *', [qty, cartId, userId]);
+
+  if (updateResult.rowCount === 0) {
+    return res.status(200).json({
+      status: false,
+      data: [],
+      message: 'Cart item not found or not authorized to delete',
+    });
+  }
+
+  res.status(200).json({
+    status: true,
+    data: [],
+    message: 'Cart item removed successfully',
+  });
+
+});
+
+app.delete('/carts/:id', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+  const cartId = req.params.id;
+
+  try {
+    const deleteResult = await client.query(
+      'DELETE FROM carts WHERE id = $1 AND user_id = $2 RETURNING *',
+      [cartId, userId]
+    );
+
+    if (deleteResult.rowCount === 0) {
+      return res.status(404).json({ message: 'Cart item not found or not authorized to delete' });
+    }
+
+    res.status(200).json({ message: 'Cart item removed successfully' });
+  } catch (error) {
+    console.error("Error removing cart item:", error);
+    res.status(500).json({ message: 'Failed to remove cart item' });
+  }
+});
+
 app.post('/checkout', verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
