@@ -519,21 +519,22 @@ app.get('/categories', async (req, res) => {
 app.get('/carts', verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
-  const cartQuery = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1', [userId]);
+  const cartQuery = await client.query('SELECT * FROM carts WHERE user_id = $1', [userId]);
   let cart = cartQuery.rows;
 
   if (cart.length === 0) {
-    const newCartQuery = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING *', [userId]);
-    cart = newCartQuery.rows;
+    return res.status(200).json({
+      status: true,
+      data: [],
+      message: "Cart is empty",
+    });
   }
-
-  const cartItemsQuery = await client.query('SELECT * FROM cart_items WHERE cart_id = $1', [cart[0].id]);
-  const cartItems = cartItemsQuery.rows;
 
   const data = [];
 
-  for (let i = 0; i < cartItems.length; i++) {
-    const productQuery = await client.query('SELECT * FROM products WHERE id = $1', [cartItems[i].product_id]);
+  for (let i = 0; i < cart.length; i++) {
+    const productQuery = await client.query('SELECT * FROM products WHERE id = $1', [cart[i].product_id]);
+
     if (productQuery.rows.length > 0) {
       const product = productQuery.rows[0];
 
@@ -543,7 +544,7 @@ app.get('/carts', verifyToken, async (req, res) => {
         description: product.description,
         images: product.images,
         price: product.price,
-        qty: cartItems[i].qty,
+        qty: cart[i].qty,
       });
     }
   }
@@ -556,25 +557,10 @@ app.get('/carts', verifyToken, async (req, res) => {
 });
 
 app.post('/carts', verifyToken, async (req, res) => {
-
-  const productId = req.body.productId;
-  const qty = req.body.qty;
   const userId = req.user.userId;
-  const cartResult = await client.query('SELECT * FROM carts WHERE user_id = $1 AND status = 1 ORDER BY created_at DESC LIMIT 1',[userId]);
-  var cartId = -1;
-
-  if (cartResult.rows.length > 0)
-    cartId = cartResult.rows[0].id;
-  else
-    cartId = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [userId]);
-
-  const result = await client.query('INSERT INTO cart_items (cart_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *', [cartId, productId, qty]);
-
-  return res.status(201).json({
-    status: true,
-    data: result.rows[0],
-    message: "Success add product into cart.",
-  });
+  const { productId, qty } = req.body;
+  await client.query('INSERT INTO carts (user_id, product_id, qty) VALUES ($1, $2, $3) RETURNING *', [userId, productId, qty]);
+  res.status(200).json({ message: 'Item added to cart successfully' });
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
@@ -638,70 +624,42 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
     });
 });
 
-app.post('/orders', verifyToken, async (req, res) => {
+// app.post('/orders', verifyToken, async (req, res) => {
 
-  //const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
-  const userId = req.user.userId;
+//   //const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
+//   const userId = req.user.userId;
 
-  const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
-  const cartResult = await client.query(cartQuery, [userId]);
+//   const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
+//   const cartResult = await client.query(cartQuery, [userId]);
 
-  if (cartResult.rows.length === 0) {
-    return res.status(400).json({ error: 'Cart is empty' });
-  }
+//   if (cartResult.rows.length === 0) {
+//     return res.status(400).json({ error: 'Cart is empty' });
+//   }
 
-  const cartItems = cartResult.rows;
+//   const cartItems = cartResult.rows;
+//   const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
 
-  // Calculate grand total from cart items
-  const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
+//   const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
+//   await client.query(closeCartQuery, [userId]);
 
-  // Insert the order into the orders table
-  // const orderQuery = `
-  //   INSERT INTO orders (
-  //     firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grand_total
-  //   ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-  //   RETURNING id
-  // `;
-  // const orderValues = [
-  //   firstname, lastname, phone, email, address, address2, country, state, city, zip, notes, grandTotal
-  // ];
-  // const orderResult = await client.query(orderQuery, orderValues);
-  //const orderId = orderResult.rows[0].id;
-
-  // Insert each cart item into the order_items table
-  // const orderItemsQuery = `
-  //   INSERT INTO order_items (order_id, product_name, quantity, unit_price, total_price)
-  //   VALUES ($1, $2, $3, $4, $5)
-  // `;
-  // for (const item of cartItems) {
-  //   const orderItemValues = [
-  //     orderId, item.product_name, item.quantity, item.unit_price, item.quantity * item.unit_price
-  //   ];
-  //   await client.query(orderItemsQuery, orderItemValues);
-  // }
-
-  // Mark the user's cart as closed (status = 0) after the order is created
-  const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
-  await client.query(closeCartQuery, [userId]);
-
-  const lineItems = cartItems.map(item => ({
-    price_data: {
-      currency: 'myr',
-      product_data: {
-        name: item.product_name,
-      },
-      unit_amount: item.unit_price * 100,
-    },
-    quantity: item.quantity,
-  }));
+//   const lineItems = cartItems.map(item => ({
+//     price_data: {
+//       currency: 'myr',
+//       product_data: {
+//         name: item.product_name,
+//       },
+//       unit_amount: item.unit_price * 100,
+//     },
+//     quantity: item.quantity,
+//   }));
   
-  const session = await stripe.checkout.sessions.create({
-    line_items: lineItems,
-    mode: 'payment',
-    success_url: 'www.snk157.com/thankyou',
-    cancel_url: 'www.snk157.com/',
-  });
+//   const session = await stripe.checkout.sessions.create({
+//     line_items: lineItems,
+//     mode: 'payment',
+//     success_url: 'www.snk157.com/thankyou',
+//     cancel_url: 'www.snk157.com/',
+//   });
 
-  res.redirect(303, session.url);
+//   res.redirect(303, session.url);
  
-});
+// });
