@@ -600,7 +600,7 @@ app.post('/checkout', verifyToken, async (req, res) => {
     success_url: 'http://localhost:4242/success',
     cancel_url: 'http://localhost:4242/cancel',
     shipping_address_collection: {
-      allowed_countries: []
+      allowed_countries: ["MY"]
     },
     phone_number_collection: true
   });
