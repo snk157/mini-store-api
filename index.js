@@ -673,8 +673,6 @@ app.post('/checkout', verifyToken, async (req, res) => {
   const session = await stripe.checkout.sessions.create({
     line_items: lineItems,
     mode: 'payment',
-    success_url: `http://www.snk157.com/thankyou.html?orderNumber=${session.id}&totalAmount=${totalAmount}`,
-    cancel_url: `http://www.snk157.com/cancel.html?orderNumber=${session.id}&totalAmount=${totalAmount}`,
     customer_email: user.rows[0].email,
     billing_address_collection: 'auto',
     shipping_address_collection: {
@@ -687,6 +685,15 @@ app.post('/checkout', verifyToken, async (req, res) => {
       user_id: userId.toString()
     },
   });
+
+  const successUrl = `http://www.snk157.com/thankyou.html?orderNumber=${session.id}&totalAmount=${totalAmount}`;
+  const cancelUrl = `http://www.snk157.com/cancel.html?orderNumber=${session.id}&totalAmount=${totalAmount}`;
+
+  const updatedSession = await stripe.checkout.sessions.update(session.id, {
+    success_url: successUrl,
+    cancel_url: cancelUrl
+  });
+
 
   // Delete the rows before redirect
   // await client.query('DELETE FROM carts WHERE user_id = $1', [userId]);
