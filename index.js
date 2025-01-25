@@ -641,7 +641,7 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 app.post('/orders', verifyToken, async (req, res) => {
 
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: grandTotal,
+    amount: 100,
     currency: 'myr',
     automatic_payment_methods: {
       enabled: true,
