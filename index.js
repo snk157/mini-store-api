@@ -641,7 +641,7 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 app.post('/orders', verifyToken, async (req, res) => {
 
   //const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
   const cartResult = await client.query(cartQuery, [userId]);
