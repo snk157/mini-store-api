@@ -683,5 +683,21 @@ app.post('/orders', verifyToken, async (req, res) => {
   const closeCartQuery = 'UPDATE cart SET status = 0 WHERE user_id = $1 AND status = 1';
   await client.query(closeCartQuery, [userId]);
 
-  res.status(201).json({ message: 'Order created successfully', orderId });
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: grandTotal,
+    currency: 'myr',
+    automatic_payment_methods: {
+      enabled: true,
+    },
+  });
+
+  res.status(200).json({
+    status: true,
+    data: {
+      orderId: orderId,
+      stripePublicKey: process.env.STRIPE_PUBLIC_KEY,
+      paymentIntent: paymentIntent.client_secret
+    },
+    message: "",
+  });
 });
