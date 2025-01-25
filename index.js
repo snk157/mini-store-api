@@ -602,7 +602,7 @@ app.post('/checkout', verifyToken, async (req, res) => {
   });
 
   // Redirect to Stripe's checkout page
-  res.redirect(303, session.url);
+  res.status(200).json({ sessionUrl: session.url });
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
