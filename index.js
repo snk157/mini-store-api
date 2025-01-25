@@ -563,6 +563,48 @@ app.post('/carts', verifyToken, async (req, res) => {
   res.status(200).json({ message: 'Item added to cart successfully' });
 });
 
+app.post('/checkout', verifyToken, async (req, res) => {
+  const userId = req.user.userId;
+
+  const cartQuery = await client.query('SELECT * FROM carts WHERE user_id = $1', [userId]);
+  let carts = cartQuery.rows;
+
+  if (carts.length === 0) {
+    return res.status(400).json({ error: 'No items in the cart' });
+  }
+
+  // Fetch the products details (name, price) from the products table for each product in the cart
+  const productIds = carts.map(item => item.product_id);
+  const productsQuery = await client.query('SELECT * FROM products WHERE id = ANY($1)', [productIds]);
+  const products = productsQuery.rows;
+
+  // Map cart items to line items for checkout
+  const lineItems = carts.map(item => {
+    const product = products.find(p => p.id === item.product_id);
+    return {
+      price_data: {
+        currency: 'myr',
+        product_data: {
+          name: product.product_name,
+        },
+        unit_amount: product.price * 100,
+      },
+      quantity: item.qty,
+    };
+  });
+
+  // Create a checkout session
+  const session = await stripe.checkout.sessions.create({
+    line_items: lineItems,
+    mode: 'payment',
+    success_url: 'http://localhost:4242/success',
+    cancel_url: 'http://localhost:4242/cancel',
+  });
+
+  // Redirect to Stripe's checkout page
+  res.redirect(303, session.url);
+});
+
 app.get('/orders', verifyToken, async (req, res) => {
 
   let query = `SELECT * FROM orders`;
