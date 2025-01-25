@@ -699,7 +699,7 @@ app.post('/checkout', verifyToken, async (req, res) => {
   // await client.query('DELETE FROM carts WHERE user_id = $1', [userId]);
 
   // Redirect to Stripe's checkout page
-  res.status(200).json({ sessionUrl: session.url });
+  res.status(200).json({ sessionUrl: updatedSession.url });
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
