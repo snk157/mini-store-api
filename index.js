@@ -599,7 +599,9 @@ app.post('/checkout', verifyToken, async (req, res) => {
     mode: 'payment',
     success_url: 'http://localhost:4242/success',
     cancel_url: 'http://localhost:4242/cancel',
-    phone_number_collection: true
+    shipping_address_collection: {
+      allowed_countries: ['MY']
+    },
   });
 
   // Redirect to Stripe's checkout page
