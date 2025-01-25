@@ -566,6 +566,7 @@ app.post('/carts', verifyToken, async (req, res) => {
 app.post('/checkout', verifyToken, async (req, res) => {
   const userId = req.user.userId;
 
+  const user = await client.query('SELECT * FROM users WHERE id = $1', [userId]);
   const cartQuery = await client.query('SELECT * FROM carts WHERE user_id = $1', [userId]);
   let carts = cartQuery.rows;
 
@@ -599,8 +600,16 @@ app.post('/checkout', verifyToken, async (req, res) => {
     mode: 'payment',
     success_url: 'http://localhost:4242/success',
     cancel_url: 'http://localhost:4242/cancel',
+    customer_email: user.rows[0].email,
+    billing_address_collection: 'auto',
     shipping_address_collection: {
       allowed_countries: ['MY']
+    },
+    phone_number_collection: {
+      enabled: true,
+    },
+    metadata: {
+      user_id: userId.toString()
     },
   });
 
@@ -609,102 +618,58 @@ app.post('/checkout', verifyToken, async (req, res) => {
 });
 
 app.get('/orders', verifyToken, async (req, res) => {
+  const sessions = await stripe.checkout.sessions.list({});
+  let filteredSessions;
 
-  let query = `SELECT * FROM orders`;
-  let params = [];
-
+  const userId = req.user.userId;
   if(req.user.user_type == 1)
   {
-    query += ` WHERE user_id = $1`;
-    params.push(req.user.userId);
+    filteredSessions = sessions.data.filter(session => session.metadata.user_id === userId.toString());
   }
-
-  client.query(query, params)
-    .then((result) => {
-      return res.status(200).json({
-        status: true,
-        data: result.rows,
-        message: "Success",
-      });
-    })
-    .catch((e) => {
-      console.error(e.stack);
-      res.status(500).send(e.stack);
-    });
+  else
+  {
+    filteredSessions = sessions.data;
+  }
+  
+  res.status(200).json({
+    status: true,
+    data: filteredSessions,
+    message: ""
+  });
 });
 
 app.get('/orders/:id', verifyToken, async (req, res) => {
-  client.query("SELECT * FROM orders WHERE id = $1", [req.params.id])
-    .then(async (result) => {
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          status: false,
-          message: "Error: Order not found.",
-        });
-      }
+  const orderId = req.params.id; // Get session ID (order ID) from route parameter
+  const session = await stripe.checkout.sessions.retrieve(orderId);
 
-      if(req.user.user_type == 1 && result.rows[0].user_id != req.user.userId) {
-        return res.status(404).json({
-          status: false,
-          message: "Error: Unauthorized.",
-        });
-      }
-
-      const itemsResult = await client.query("SELECT * FROM order_items WHERE order_id = $1", [req.params.id]);
-
-      const orderWithItems = {
-        ...orderResult.rows[0],
-        items: itemsResult.rows,
-      };
-  
-      return res.status(200).json({
-        status: true,
-        data: orderWithItems,
-        message: "Success",
-      });
-    })
-    .catch((e) => {
-      console.error(e.stack);
-      res.status(500).send(e.stack);
+  if (!session) {
+    return res.status(404).json({
+      status: false,
+      message: 'Order not found',
     });
+  }
+
+  const userId = req.user.userId;
+  if (req.user.user_type === 1 && session.metadata.user_id !== userId.toString()) {
+    return res.status(403).json({
+      status: false,
+      message: 'You do not have access to this order',
+    });
+  }
+
+  const lineItems = await stripe.checkout.sessions.listLineItems(orderId);
+
+  res.status(200).json({
+    status: true,
+    order: {
+      id: session.id,
+      amount_total: session.amount_total,
+      currency: session.currency,
+      payment_status: session.payment_status,
+      customer_email: session.customer_email,
+      billing_details: session.billing_details,
+      shipping_details: session.shipping_details,
+      line_items: lineItems.data,
+    },
+  });
 });
-
-// app.post('/orders', verifyToken, async (req, res) => {
-
-//   //const { firstname, lastname, phone, email, address, address2, country, state, city, zip, notes } = req.body;
-//   const userId = req.user.userId;
-
-//   const cartQuery = 'SELECT * FROM carts WHERE user_id = $1';
-//   const cartResult = await client.query(cartQuery, [userId]);
-
-//   if (cartResult.rows.length === 0) {
-//     return res.status(400).json({ error: 'Cart is empty' });
-//   }
-
-//   const cartItems = cartResult.rows;
-//   const grandTotal = cartItems.reduce((total, item) => total + item.quantity * item.unit_price, 0);
-
-//   const closeCartQuery = 'UPDATE carts SET status = 0 WHERE user_id = $1 AND status = 1';
-//   await client.query(closeCartQuery, [userId]);
-
-//   const lineItems = cartItems.map(item => ({
-//     price_data: {
-//       currency: 'myr',
-//       product_data: {
-//         name: item.product_name,
-//       },
-//       unit_amount: item.unit_price * 100,
-//     },
-//     quantity: item.quantity,
-//   }));
-  
-//   const session = await stripe.checkout.sessions.create({
-//     line_items: lineItems,
-//     mode: 'payment',
-//     success_url: 'www.snk157.com/thankyou',
-//     cancel_url: 'www.snk157.com/',
-//   });
-
-//   res.redirect(303, session.url);
- 
-// });
