@@ -691,6 +691,9 @@ app.post('/orders', verifyToken, async (req, res) => {
     },
   });
 
+  console.log(process.env.STRIPE_PUBLIC_KEY);
+  console.log(JSON.stringify(paymentIntent));
+
   return res.status(200).json({
     status: true,
     data: {
