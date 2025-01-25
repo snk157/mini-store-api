@@ -539,7 +539,7 @@ app.get('/carts', verifyToken, async (req, res) => {
       const product = productQuery.rows[0];
 
       data.push({
-        id: product.id,
+        id: cart[i].id,
         product_name: product.product_name,
         description: product.description,
         images: product.images,
