@@ -737,11 +737,11 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 
   const lineItems = await stripe.checkout.sessions.listLineItems(orderId);
 
-  console.log(JSON.stringify(session));
   res.status(200).json({
     status: true,
     order: {
       id: session.id,
+      created: session.created,
       amount_total: session.amount_total,
       currency: session.currency,
       payment_status: session.payment_status,
