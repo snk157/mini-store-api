@@ -717,7 +717,7 @@ app.get('/orders', verifyToken, async (req, res) => {
 });
 
 app.get('/orders/:id', verifyToken, async (req, res) => {
-  const orderId = req.params.id; // Get session ID (order ID) from route parameter
+  const orderId = req.params.id;
   const session = await stripe.checkout.sessions.retrieve(orderId);
 
   if (!session) {
@@ -737,6 +737,7 @@ app.get('/orders/:id', verifyToken, async (req, res) => {
 
   const lineItems = await stripe.checkout.sessions.listLineItems(orderId);
 
+  debug.log(JSON.stringify(session));
   res.status(200).json({
     status: true,
     order: {
