@@ -208,13 +208,13 @@ app.post('/profile/:id', verifyToken, async (req, res) => {
     const result = await client.query("SELECT password FROM users WHERE id = $1 AND password = crypt($2, password)", [req.user.userId, req.body.oldPassword]);
     if(result.rows.length > 0)
     {
-      if (req.body.name || req.body.contact) {
+      if (req.body.username || req.body.contact) {
         const updates = [];
         const values = [];
         let query = "UPDATE users SET ";
 
-        if (req.body.name) {
-          updates.push("name = $" + (values.length + 1));
+        if (req.body.username) {
+          updates.push("username = $" + (values.length + 1));
           values.push(req.body.name);
         }
         if (req.body.contact) {
