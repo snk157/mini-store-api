@@ -349,6 +349,13 @@ app.post('/product', verifyToken, upload.array('images[]', 10), async (req, res)
   const isFeature = req.body['is-feature'] === 'on';
   const files = req.files;
 
+  if (!category) {
+    return res.status(400).json({
+      status: false,
+      message: 'Error: Please select a category.',
+    });
+  }
+
   if (!files || files.length === 0) {
     return res.status(400).json({
       status: false,
